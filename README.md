@@ -1,6 +1,6 @@
 # 📋 无人机航拍浮游植物智能识别与水华预警系统 —— 团队主README
 
-*（基于最新讨论成果修正，纯文字结构化，适配大创项目文档/汇报直接使用）*
+*（纯文字结构化，适配大创项目文档/汇报直接使用）*
 
 ## 🎯 1. 项目概述
 
@@ -15,6 +15,7 @@
 1. **数据层**：完成高质量无人机浮游植物数据集构建，含原始航拍采集（覆盖晴天/阴天/雾天）、专业图像预处理、像素级LabelMe标注，数据无错标、漏标、格式混乱，可直接用于深度学习模型训练。
 2. **算法层**：基于天气分类网络 + 多条件 DeepLabV3+ 实现浮游植物像素级语义分割，达成四大核心功能：① 精准识别有无浮游植物聚集；② 定位其空间分布；③ 区分微囊藻（蓝藻）、水华鱼腥藻（蓝藻）、水绵（绿藻）及其他常见浮游植物；④ 量化浮游植物覆盖面积、覆盖率、浓度等级（高/中/低）。
    - **天气自适应分割策略**：由于浮游植物多类别分割依赖细微色彩差异，不同天气条件下光照、散射、雾霾导致的色偏会严重干扰模型判断。为此引入前置天气分类模型（识别晴天/阴天/雾天），并分别训练三个专用的 DeepLabV3+ 分割模型。DeepLabV3+ 凭借其空洞空间金字塔池化（ASPP）模块，能有效捕捉不同尺度的浮游植物斑块特征，结合天气自适应路由，极大提升复杂环境下的分割鲁棒性与精细度。
+   - **天气分类模型数据来源**：天气分类属于通用视觉任务，使用公开数据集（如 FlyAwareV2、Weather Detection Image Dataset）进行训练，无需占用本项目数据标注人力。
 3. **数模层**：基于AI视觉输出的时序实测数据，搭建水华增长预测模型，输出未来1-2个月浮游植物分布、面积变化与水华风险等级，预测数据格式与实测数据完全对齐。
 4. **展示层**：开发本地可运行交互式可视化Demo，实现核心交互：① 拖动时间进度条切换不同日期；② 一键切换“实测模式/预测模式”查看浮游植物分布图；③ 同步展示面积、覆盖率、浓度等级等量化数据；演示采用「3-5组真实实测数据+模拟预测数据」，无需每日拍摄更新。
 5. **协同层**：各模块数据对接顺畅、分工边界清晰，全流程可现场操作演示，满足结题答辩验收要求。
@@ -37,11 +38,11 @@
 **具体职责**
 
 - **数据采集配合**：对接航拍组，明确拍摄规范（垂直90°俯拍、M档RAW、10-50m高度、覆盖晴天/阴天/雾天），整理原始航拍图像，按「拍摄日期+天气+序号」命名规则归档至 `data/01_raw/`，确保数据完整无缺失。
-- **图像预处理**：对原始图像执行去反光、去雾、色彩校正、畸变矫正、尺寸统一（1024×1024），输出干净、无干扰、浮游植物特征清晰的标准PNG图像至 `data/02_preprocessed/images/`，文件名与原始图保持一致。
+- **图像预处理**：对原始图像执行去反光、去雾、色彩校正、畸变矫正、尺寸统一（1024×1024），输出干净、无干扰、浮游植物特征清晰的标准PNG图像至 `data/02_preprocessed/images/`，文件名与原始图保持一致（如 `20240315_sunny_001.png`）。
 - **像素级标注**：使用LabelMe工具，对干净图像完成标注，标注类别统一：微囊藻、水华鱼腥藻、水绵、其他浮游植物、清水、泥沙、阴影，生成JSON标注文件存入 `data/03_labeled/labels_json/`，对应像素掩码图存入 `data/03_labeled/masks/`。
 - **数据标准化**：撰写数据规范文档，确保文件命名、目录结构符合项目约定。
 
-**不涉及工作**：不参与深度学习模型训练、浮游植物量化计算、数模预测、前端可视化开发、展示端对接。
+**不涉及工作**：不参与深度学习模型训练（包括天气分类模型与分割模型）、浮游植物量化计算、数模预测、前端可视化开发、展示端对接。
 
 ---
 
@@ -51,7 +52,7 @@
 
 **具体职责**
 
-- **天气分类模型构建**：从 `data/02_preprocessed/images/` 读取预处理图像，基于文件名解析天气标签，训练轻量级天气分类模型，权重保存至 `models/weather_classifier/`。
+- **天气分类模型构建**：使用公开天气分类数据集（存放于 `data/weather_public/`，如 FlyAwareV2、Weather Detection Image Dataset）训练轻量级天气分类模型（如 ResNet-18 / MobileNet），用于自动识别输入航拍图为“晴天”、“阴天”或“雾天”，权重保存至 `models/weather_classifier/`。
 - **多条件分割模型训练**：从 `data/03_labeled/` 读取图像与掩码，按文件名中的天气标签划分三个子数据集，分别训练三个独立的 DeepLabV3+ 语义分割模型，权重分别保存至 `models/deeplabv3plus/sunny/`、`cloudy/`、`foggy/`。
 - **推理与量化计算**：推理脚本 `models/predict_pipeline.py` 接收输入图像，自动调用天气分类模型，路由至对应 DeepLabV3+ 模型，输出分割掩码图至 `outputs/masks/`，量化数据（JSON/CSV）至 `outputs/quantifications/`。
 - **数据格式对齐**：接收数模组预测数据，统一实测/预测数据格式，适配展示端加载需求。
@@ -81,7 +82,7 @@
 
 **具体职责**
 
-- **展示端开发**：基于Python（Streamlit/Dash）搭建前后端框架，代码存放于 `app/`，实现本地可运行程序。
+- **展示端开发**：基于Python（Streamlit/Dash）搭建前后端框架，实现本地可运行程序（具体框架与目录结构待定，大创阶段以完成演示功能为准，不强制要求独立 `app/` 目录）。
 - **核心交互功能**：从 `outputs/masks/` 和 `outputs/quantifications/` 读取数据，搭建时间进度条、“实测/预测模式”切换、分布图动态渲染，同步展示量化数据。
 - **演示优化**：打磨操作流程，确保现场演示流畅。
 
@@ -96,11 +97,11 @@
 1. 航拍组按规范完成水体无人机航拍（覆盖晴天/阴天/雾天），交付原始航拍图像给贺一冉，图像命名为 `YYYYMMDD_天气_序号.RAW`，存入 `data/01_raw/`。
 2. 贺一冉对原始图像完成预处理，输出干净标准PNG图像至 `data/02_preprocessed/images/`，文件名保持不变（扩展名改为.png）。
 3. 贺一冉使用LabelMe完成干净图像像素级标注，生成JSON标注文件存入 `data/03_labeled/labels_json/`，掩码图存入 `data/03_labeled/masks/`，交付吴天宇、刘俊辉。
-4. 吴天宇、刘俊辉基于 `data/03_labeled/` 完成天气分类模型与三个 DeepLabV3+ 模型训练；权重分别保存至 `models/weather_classifier/` 和 `models/deeplabv3plus/`。
+4. 吴天宇、刘俊辉基于 `data/weather_public/` 中的公开数据集训练天气分类模型；基于 `data/03_labeled/` 完成三个 DeepLabV3+ 模型训练；权重分别保存至 `models/weather_classifier/` 和 `models/deeplabv3plus/`。
 5. 吴天宇、刘俊辉运行 `models/predict_pipeline.py`，对测试图像（存放于 `test_images/` 或历史航拍图）执行推理，输出分割掩码图至 `outputs/masks/`，实测量化数据至 `outputs/quantifications/`，交付数模组。
 6. 数模组从 `outputs/quantifications/` 读取实测时序数据，完成预测模型搭建与未来浮游植物分布推演，输出标准化预测数据，交付吴天宇、刘俊辉进行格式对齐后存回 `outputs/quantifications/`。
 7. 吴天宇、刘俊辉确保 `outputs/` 下数据格式统一，交付乔梓阁。
-8. 乔梓阁基于 `app/` 开发展示端，从 `outputs/` 读取素材，完成交互功能搭建。
+8. 乔梓阁基于展示端框架（如Streamlit）开发交互功能，从 `outputs/` 读取素材，完成Demo搭建。
 9. 全团队联调测试，验证模块数据对接，准备结题答辩。
 
 ## 📦 5. 各模块核心交付物
@@ -114,7 +115,7 @@
 
 ### 🤖 5.2 AI视觉语义分割与量化模块（吴天宇、刘俊辉）
 
-- 训练完成的天气分类模型文件（`models/weather_classifier/`）；
+- 训练完成的天气分类模型文件（`models/weather_classifier/`，训练数据来源于 `data/weather_public/` 公开数据集）；
 - 训练完成的三个 DeepLabV3+ 分割模型文件（`models/deeplabv3plus/sunny/`、`cloudy/`、`foggy/`）；
 - 模型训练、推理全套可运行代码（含 `predict_pipeline.py`）；
 - 实测分割掩码图（`outputs/masks/`）与量化数据（`outputs/quantifications/`）；
@@ -129,7 +130,7 @@
 
 ### 🎨 5.4 交互式可视化展示模块（乔梓阁）
 
-- 本地可独立运行的展示端Demo程序（`app/` 目录）；
+- 本地可独立运行的展示端Demo程序（框架与目录待定）；
 - 展示端操作手册与演示流程文档。
 
 ---
@@ -138,59 +139,56 @@
 ```
 Phytoplankton_UAV_Project/
 │
-├── data/                                    # 所有数据统一存放
-│   ├── 01_raw/                              # 原始航拍图（直接存放，无子文件夹）
-│   │   ├── 20240315_sunny_001.RAW
-│   │   ├── 20240320_cloudy_001.RAW
-│   │   └── 20240402_foggy_001.RAW
-│   │
-│   ├── 02_preprocessed/                     # 预处理后的干净图像
-│   │   └── images/                          # PNG格式，文件名与原始图对应
-│   │       ├── 20240315_sunny_001.png
-│   │       ├── 20240320_cloudy_001.png
-│   │       └── 20240402_foggy_001.png
-│   │
-│   └── 03_labeled/                          # 标注数据集
-│       ├── labels_json/                     # LabelMe标注文件
-│       │   ├── 20240315_sunny_001.json
-│       │   └── ...
-│       └── masks/                           # 像素掩码图
-│           ├── 20240315_sunny_001.png
-│           └── ...
+├── data/ # 所有数据统一存放
+│ ├── 01_raw/ # 原始航拍图（直接存放，无子文件夹）
+│ │ ├── 20240315_sunny_001.RAW
+│ │ ├── 20240320_cloudy_001.RAW
+│ │ └── 20240402_foggy_001.RAW
+│ │
+│ ├── 02_preprocessed/ # 预处理后的干净图像
+│ │ └── images/ # PNG格式，文件名与原始图对应
+│ │ ├── 20240315_sunny_001.png
+│ │ ├── 20240320_cloudy_001.png
+│ │ └── 20240402_foggy_001.png
+│ │
+│ ├── 03_labeled/ # 标注数据集
+│ │ ├── labels_json/ # LabelMe标注文件
+│ │ │ ├── 20240315_sunny_001.json
+│ │ │ └── ...
+│ │ └── masks/ # 像素掩码图
+│ │ ├── 20240315_sunny_001.png
+│ │ └── ...
+│ │
+│ └── weather_public/ # 公开天气分类数据集（用于训练天气分类模型）
 │
-├── models/                                  # 模型训练、保存与推理代码
-│   ├── weather_classifier/
-│   │   ├── train.py                         # 训练脚本，读取 ../data/02_preprocessed/images/，输出 model.pth
-│   │   ├── model.pth
-│   │   └── inference.py
-│   │
-│   ├── deeplabv3plus/
-│   │   ├── sunny/
-│   │   │   ├── train.py                     # 训练脚本，读取 ../../../data/03_labeled/ 中天气为 sunny 的数据
-│   │   │   └── best_model.pth
-│   │   ├── cloudy/
-│   │   │   ├── train.py
-│   │   │   └── best_model.pth
-│   │   └── foggy/
-│   │       ├── train.py
-│   │       └── best_model.pth
-│   │
-│   └── predict_pipeline.py                  # 总推理入口：输入图像 → 天气分类 → 调用对应分割模型 → 输出结果到 ../../outputs/
+├── models/ # 模型训练、保存与推理代码
+│ ├── weather_classifier/
+│ │ ├── train.py # 训练脚本，读取 ../../data/weather_public/，输出 model.pth
+│ │ ├── model.pth
+│ │ └── inference.py
+│ │
+│ ├── deeplabv3plus/
+│ │ ├── sunny/
+│ │ │ ├── train.py # 训练脚本，读取 ../../../data/03_labeled/ 中天气为 sunny 的数据
+│ │ │ └── best_model.pth
+│ │ ├── cloudy/
+│ │ │ ├── train.py
+│ │ │ └── best_model.pth
+│ │ └── foggy/
+│ │ ├── train.py
+│ │ └── best_model.pth
+│ │
+│ └── predict_pipeline.py # 总推理入口：输入图像 → 天气分类 → 调用对应分割模型 → 输出结果到 ../../outputs/
 │
-├── test_images/                             # 演示用测试图
-│   ├── 20240501_sunny_test.png
-│   └── ...
+├── test_images/ # 演示用测试图
+│ ├── 20240501_sunny_test.png
+│ └── ...
 │
-├── outputs/                                 # 所有推理输出结果
-│   ├── masks/                               # 分割掩码可视化图
-│   ├── quantifications/                     # 面积/覆盖率/浓度等 JSON/CSV
-│   └── reports/                             # 评估报告（可选）
+├── outputs/ # 所有推理输出结果
+│ ├── masks/ # 分割掩码可视化图
+│ ├── quantifications/ # 面积/覆盖率/浓度等 JSON/CSV
+│ └── reports/ # 评估报告（可选）
 │
-├── app/                                     # 展示端代码
-│   ├── main.py
-│   └── utils.py
-│
-├── notebooks/                               # 探索性笔记（可选）
 ├── requirements.txt
 └── README.md
 ```
@@ -202,11 +200,11 @@ Phytoplankton_UAV_Project/
 | `data/01_raw/` | 数据模块 | 航拍组采集 | 存放原始RAW图像，作为数据源头 |
 | `data/02_preprocessed/images/` | 数据模块 | 原始RAW图像 | 预处理后的PNG图像，供标注和模型训练使用 |
 | `data/03_labeled/` | 数据模块 | 预处理图像 | JSON标注与掩码图，供AI模块训练分割模型 |
-| `models/weather_classifier/train.py` | AI视觉模块 | `data/02_preprocessed/images/`（通过文件名解析天气标签） | 天气分类模型权重 `model.pth` |
-| `models/deeplabv3plus/{weather}/train.py` | AI视觉模块 | `data/03_labeled/` 中对应天气的图像与掩码 | 对应天气的 DeepLabV3+ 权重 `best_model.pth` |
+| `data/weather_public/` | AI视觉模块 | 从公开数据集下载 | 训练天气分类模型的图像数据 |
+| `models/weather_classifier/train.py` | AI视觉模块 | `../../data/weather_public/` | 天气分类模型权重 `model.pth` |
+| `models/deeplabv3plus/{weather}/train.py` | AI视觉模块 | `../../../data/03_labeled/` 中对应天气的图像与掩码 | 对应天气的 DeepLabV3+ 权重 `best_model.pth` |
 | `models/predict_pipeline.py` | AI视觉模块 | 输入图像路径（如 `test_images/xxx.png`） | `outputs/masks/` 掩码图，`outputs/quantifications/` 量化JSON |
 | `outputs/` | AI视觉模块（输出）/ 展示模块（读取） | AI推理结果 / 数模预测结果 | 展示端直接读取，无需中间转换 |
-| `app/main.py` | 展示模块 | `outputs/masks/`、`outputs/quantifications/` | 本地Web界面，用户可交互查看 |
 
 ### 6.2 文件命名规范
 
@@ -224,7 +222,7 @@ Phytoplankton_UAV_Project/
 - 航拍组采集多天气图像；贺一冉完成预处理、全量LabelMe标注；团队验收数据集。
 
 ### 7.2 第二阶段：算法模型开发期（第3-5个月）
-- 吴天宇、刘俊辉完成天气分类模型与三个 DeepLabV3+ 分割模型的训练、推理、量化；数模组完成预测模型搭建；两组完成数据格式对齐。
+- 吴天宇、刘俊辉基于公开数据集训练天气分类模型，基于标注数据集训练三个 DeepLabV3+ 分割模型；数模组完成预测模型搭建；两组完成数据格式对齐。
 
 ### 7.3 第三阶段：展示端开发与集成期（第6-8个月）
 - 乔梓阁完成展示端开发；全团队联调测试，完善演示流程。
