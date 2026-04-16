@@ -22,10 +22,14 @@
 - 按 `YYYYMMDD_天气_序号.RAW` / `YYYYMMDD_天气_序号.json` 命名，分别存入 `data/01_raw/images/` 和 `data/01_raw/drone_json/`。
 - 建立采集台账，记录每张图像的拍摄日期、天气、区域。
 
-**2. 几何校正执行（正射校正）**
+**2. 几何校正执行**
 - 使用 AI 模块提供的脚本 `utils/preprocess/orthorectify.py`。
 - 批量读取 `data/01_raw/images/` 中的 RAW 图像及 `data/01_raw/drone_json/` 中的同名参数文件。
-- 执行正射校正，输出垂直视角的 PNG 图像至 `data/02_preprocessed/images/`，文件名与原始图一致（仅扩展名变化）。
+- 执行正射校正，脚本将自动完成以下处理：
+  - 纠正图像为垂直视角；
+  - 等比缩放至长边 1024 像素，黑色填充为 1024×1024 正方形；
+  - 输出 PNG 图像至 `data/02_preprocessed/images/`，文件名与原始图一致（仅扩展名变化）；
+  - **同步生成元数据 JSON 文件（`_meta.json`）至 `data/02_preprocessed/meta/`，记录缩放后的 GSD 值（米/像素）。**
 - **注意：色彩校正、去雾等操作由天气自适应分割模型隐式处理，此处不进行。**
 
 **3. LabelMe像素级标注**
