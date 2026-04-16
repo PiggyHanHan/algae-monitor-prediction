@@ -22,9 +22,11 @@
 - 核验数据完整性，反馈异常至贺一冉修正。
 
 **2. 天气分类模型训练**
-- 数据来源：`../../data/weather_public/`，需自行下载公开数据集（推荐 FlyAwareV2、Weather Detection Image Dataset），按 `sunny/`、`cloudy/`、`foggy/` 分文件夹存放。
+- 数据来源：`../../data/weather_public/`，使用 **多类天气图片数据集**（深圳大学VCC，和鲸社区下载：https://www.heywhale.com/mw/dataset/5e732227c59d610036227d89）。
+- 数据结构：下载后解压，仅保留 `sunny/`、`cloudy/`、`haze/` 三个文件夹，放入 `data/weather_public/` 下。
 - 脚本位置：`models/weather_classifier/train.py`
-- 模型保存路径：`models/weather_classifier/model.pth`
+- 模型保存路径：`models/weather_classifier/best_weather_model.pth`
+- 训练参数：批次大小 32，20 轮，Adam 优化器，初始学习率 1e-4。
 
 **3. 多条件分割模型训练**
 - 脚本位置：
