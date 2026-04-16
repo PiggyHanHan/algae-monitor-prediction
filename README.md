@@ -105,7 +105,7 @@
 2. 贺一冉使用 AI 模块提供的正射校正脚本 `utils/preprocess/orthorectify.py`，批量处理 `01_raw/` 中的图像与参数，输出几何校正后的标准PNG图像至 `data/02_preprocessed/images/`，文件名保持不变（扩展名改为.png）。
 3. 贺一冉使用 LabelMe 对校正图像完成像素级标注，生成 JSON 标注文件存入 `data/03_labeled/labels_json/`，掩码图存入 `data/03_labeled/masks/`，交付吴天宇、刘俊辉。
 4. 吴天宇、刘俊辉基于 `data/weather_public/` 中的公开数据集训练天气分类模型；基于 `data/03_labeled/` 完成三个 DeepLabV3+ 模型训练；权重分别保存至 `models/weather_classifier/` 和 `models/deeplabv3plus/`。
-5. 吴天宇、刘俊辉运行 `models/predict_pipeline.py`，对测试图像（存放于 `test_images/` 或历史航拍图）及配套参数文件执行推理，输出分割掩码图至 `outputs/masks/`，实测量化数据（含实际面积）至 `outputs/quantifications/`，交付数模组。
+5. 吴天宇、刘俊辉运行 `models/predict_pipeline.py`，对测试图像（存放于 `test_images/` 或历史航拍图）及**配套元数据文件**执行推理，输出分割掩码图至 `outputs/masks/`，实测量化数据（**基于元数据中的 GSD 计算实际面积**）至 `outputs/quantifications/`，交付数模组。
 6. 数模组从 `outputs/quantifications/` 读取实测时序数据，完成预测模型搭建与未来浮游植物分布推演，输出标准化预测数据，交付吴天宇、刘俊辉进行格式对齐后存回 `outputs/quantifications/`。
 7. 吴天宇、刘俊辉确保 `outputs/` 下数据格式统一，交付乔梓阁。
 8. 乔梓阁基于展示端框架（如Streamlit）开发交互功能，从 `outputs/` 读取素材，完成Demo搭建。
@@ -159,11 +159,13 @@ Phytoplankton_UAV_Project/
 │ │ ├── 20240320_cloudy_001.json
 │ │ └── 20240402_foggy_001.json
 │ │
-│ ├── 02_preprocessed/ # 几何校正后的干净图像（正射影像）
-│ │ └── images/ # PNG格式，文件名与原始图对应
-│ │ ├── 20240315_sunny_001.png
-│ │ ├── 20240320_cloudy_001.png
-│ │ └── 20240402_foggy_001.png
+│ ├── 02_preprocessed/
+│ │   ├── images/               # 校正后PNG图像（1024×1024，含黑色填充）
+│ │   │   ├── 20240315_sunny_001.png
+│ │   │   └── ...
+│ │   └── meta/                 # 新增：校正图像元数据（GSD、有效区域等）
+│ │       ├── 20240315_sunny_001_meta.json
+│ │       └── ...
 │ │
 │ ├── 03_labeled/ # 标注数据集（基于校正图像）
 │ │ ├── labels_json/ # LabelMe标注文件
@@ -220,24 +222,26 @@ Phytoplankton_UAV_Project/
 
 ### 6.1 文件夹结构与使用逻辑说明
 
-| 目录/文件 | 负责模块 | 读取来源 | 输出目标 |
-| :--- | :--- | :--- | :--- |
-| `data/01_raw/images/` | 数据模块 | 航拍组采集 | 存放原始RAW图像 |
-| `data/01_raw/drone_json/` | 数据模块 | 航拍组采集 | 存放配套无人机参数JSON |
-| `data/02_preprocessed/images/` | 数据模块（执行） / AI模块（提供脚本） | `01_raw/` 中的图像+参数 | 几何校正后的PNG图像，供标注和模型训练 |
-| `data/03_labeled/` | 数据模块 | 预处理图像 | JSON标注与掩码图，供AI模块训练分割模型 |
-| `data/weather_public/` | AI视觉模块 | 从公开数据集下载 | 训练天气分类模型的图像数据 |
-| `utils/preprocess/orthorectify.py` | AI视觉模块 | `../../data/01_raw/` | `../../data/02_preprocessed/images/` |
-| `models/weather_classifier/train.py` | AI视觉模块 | `../../data/weather_public/` | 天气分类模型权重 |
+| 目录/文件                                     | 负责模块 | 读取来源 | 输出目标 |
+|:------------------------------------------| :--- | :--- | :--- |
+| `data/01_raw/images/`                     | 数据模块 | 航拍组采集 | 存放原始RAW图像 |
+| `data/01_raw/drone_json/`                 | 数据模块 | 航拍组采集 | 存放配套无人机参数JSON |
+| `data/02_preprocessed/images/`            | 数据模块（执行） / AI模块（提供脚本） | `01_raw/` 中的图像+参数 | 校正、缩放、填充后的 1024×1024 PNG 图像 |
+| `data/02_preprocessed/meta/`              | 数据模块（执行） / AI模块（提供脚本） | 校正缩放参数 | 记录每张图像的 GSD、有效区域边界，供面积计算使用 |
+| `data/03_labeled/`                        | 数据模块 | 预处理图像 | JSON标注与掩码图，供AI模块训练分割模型 |
+| `data/weather_public/`                    | AI视觉模块 | 从公开数据集下载 | 训练天气分类模型的图像数据 |
+| `utils/preprocess/orthorectify.py`        | AI视觉模块 | `../../data/01_raw/` | `../../data/02_preprocessed/images/` |
+| `models/weather_classifier/train.py`      | AI视觉模块 | `../../data/weather_public/` | 天气分类模型权重 |
 | `models/deeplabv3plus/{weather}/train.py` | AI视觉模块 | `../../../data/03_labeled/` 中对应天气的图像与掩码 | 对应天气的 DeepLabV3+ 权重 |
-| `models/predict_pipeline.py` | AI视觉模块 | 输入图像路径 + 参数JSON路径 | `outputs/masks/` 掩码图，`outputs/quantifications/` 量化JSON（含实际面积） |
-| `outputs/` | AI视觉模块（输出）/ 展示模块（读取） | AI推理结果 / 数模预测结果 | 展示端直接读取，无需中间转换 |
+| `models/predict_pipeline.py`              | AI视觉模块 | 输入图像路径 + 参数JSON路径 | `outputs/masks/` 掩码图，`outputs/quantifications/` 量化JSON（含实际面积） |
+| `outputs/`                                | AI视觉模块（输出）/ 展示模块（读取） | AI推理结果 / 数模预测结果 | 展示端直接读取，无需中间转换 |
 
 ### 6.2 文件命名规范
 
 - **原始图像**：`YYYYMMDD_天气_序号.RAW`（如 `20240315_sunny_001.RAW`）
 - **无人机参数文件**：`YYYYMMDD_天气_序号.json`，与原始图像同名（如 `20240315_sunny_001.json`）
 - **预处理图像**：`YYYYMMDD_天气_序号.png`（如 `20240315_sunny_001.png`）
+- **校正图像元数据**：`YYYYMMDD_天气_序号_meta.json`（如 `20240315_sunny_001_meta.json`），存放于 `data/02_preprocessed/meta/`。
 - **标注JSON**：`YYYYMMDD_天气_序号.json`（如 `20240315_sunny_001.json`）
 - **掩码图**：`YYYYMMDD_天气_序号.png`（同名，存放于 `masks/` 子目录）
 - **天气标签取值**：`sunny`（晴天）、`cloudy`（阴天）、`foggy`（雾天）
