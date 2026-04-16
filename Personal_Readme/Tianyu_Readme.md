@@ -1,23 +1,36 @@
 ### 无人机浮游植物识别项目 - AI视觉（Tianyu）专属 README
+
 #### 一、核心定位
-作为项目AI视觉算法负责人，聚焦浮游植物视觉识别全流程。核心职责：**使用公开数据集训练天气分类模型（晴天/阴天/雾天）**，**基于贺一冉交付的标注数据集训练三个专用的 DeepLabV3+ 语义分割模型**，实现高鲁棒性的浮游植物像素级定位、分类、量化。不参与数据采集、预处理等非视觉算法环节。
+作为项目AI视觉算法负责人，聚焦浮游植物视觉识别全流程。核心职责：**提供正射校正脚本**；**使用公开数据集训练天气分类模型（晴天/阴天/雾天）**；**基于贺一冉交付的标注数据集训练三个专用的 DeepLabV3+ 语义分割模型**，实现高鲁棒性的浮游植物像素级定位、分类与面积量化。不参与数据采集、标注等非视觉算法环节。
 
 #### 二、绝对清晰的工作边界
 ✅ 核心负责（天气自适应AI视觉全流程）
-1. 天气分类模型：使用公开数据集（存放于 `data/weather_public/`）训练，无需贺一冉提供标注。
-2. 分割模型训练：从 `data/03_labeled/` 读取贺一冉交付的标注数据，按文件名中的天气标签划分三个子数据集，分别训练 DeepLabV3+ 模型。
-3. 推理链路：输入图像 → 天气分类 → 调用对应分割模型 → 输出掩码图与量化结果。
-4. 量化计算：浮游植物覆盖面积、占比、浓度等级。
+1. 正射校正脚本开发与交付。
+2. 天气分类模型：使用公开数据集（存放于 `data/weather_public/`）训练，无需贺一冉提供标注。
+3. 分割模型训练：从 `data/03_labeled/` 读取贺一冉交付的标注数据，按文件名中的天气标签划分三个子数据集，分别训练 DeepLabV3+ 模型。
+4. 推理链路：输入图像 + 无人机参数文件 → 天气分类 → 调用对应分割模型 → 输出掩码图与量化结果（含实际面积）。
+5. 量化计算：浮游植物覆盖面积（m²/亩）、占比、浓度等级。
 
 ❌ 绝不涉及
-- 不参与任何原始图像采集、预处理。
-- 不使用LabelMe开展初始像素级标注（仅复核）。
+- 不参与任何原始图像采集、标注。
 - 不进行时序分析、预测建模。
 
 #### 三、分步执行任务（含路径约定）
 
+**0. 正射校正脚本开发与交付**
+- 脚本位置：`utils/preprocess/orthorectify.py`
+- 功能要求：
+  - 读取 `data/01_raw/images/` 中的 RAW 图像及同名参数文件（位于 `data/01_raw/drone_json/`）；
+  - 利用无人机高度、姿态角、相机内参，将图像纠正为垂直正射影像（消除倾斜畸变）；
+  - 输出统一尺寸（1024×1024）的 PNG 图像至 `data/02_preprocessed/images/`；
+  - 保持原始文件名（仅扩展名改为 .png）。
+- 交付对象：贺一冉
+- 交付物：Python 脚本 + 参数文件格式说明 + 依赖库列表
+
 **1. 数据接收与核验**
-- 读取路径：`../data/02_preprocessed/images/`（预处理图像）、`../data/03_labeled/`（标注JSON与掩码）。
+- 读取路径：
+  - 校正图像：`../data/02_preprocessed/images/`
+  - 标注数据：`../data/03_labeled/`（JSON标注与掩码）
 - 文件名格式：`YYYYMMDD_天气_序号.png`，从中解析天气标签。
 - 核验数据完整性，反馈异常至贺一冉修正。
 
@@ -38,29 +51,31 @@
 
 **4. 模型推理与量化计算**
 - 脚本位置：`models/predict_pipeline.py`
-- 输入：单张预处理图像路径（如 `test_images/20240501_sunny_test.png`）
+- 输入：单张校正图像路径（如 `test_images/20240501_sunny_test.png`）及**对应的无人机参数文件路径**（如 `test_images/20240501_sunny_test.json`）
 - 执行逻辑：
-  1. 加载天气分类模型 `models/weather_classifier/model.pth`，预测天气。
-  2. 根据预测结果动态加载对应 DeepLabV3+ 模型（`models/deeplabv3plus/{weather}/best_model.pth`）。
-  3. 执行分割推理，生成掩码图。
-  4. 计算面积、占比、浓度等级。
+  1. 加载天气分类模型，预测天气；
+  2. 加载对应 DeepLabV3+ 模型，执行分割推理；
+  3. 生成分割掩码图并保存；
+  4. **读取参数文件中的地面采样距离（GSD）或高度信息，结合图像分辨率计算每像素实际面积，将分割得到的像素面积转换为真实面积（m²/亩）**；
+  5. 输出面积、占比、浓度等级等量化数据。
 - 输出路径：
   - 掩码可视化图 → `outputs/masks/输入文件名_mask.png`
-  - 量化数据 → `outputs/quantifications/输入文件名.json`
+  - 量化数据 → `outputs/quantifications/输入文件名.json`（含实际面积字段）
 
 **5. 结果交付与对接**
 - 确保 `outputs/` 目录下数据格式与数模组、展示端约定一致。
 
 #### 四、模块分工（一句话界定）
-- 航拍组：采集多天气原始图像 → `data/01_raw/`
-- 贺一冉：预处理 → `data/02_preprocessed/images/`；标注 → `data/03_labeled/`
-- **本人**：公开数据集 → 训练天气分类模型；标注数据集 → 训练分割模型；推理 → 输出至 `outputs/`
+- 航拍组：采集多天气原始图像及配套参数 → `data/01_raw/`
+- 贺一冉：执行正射校正 → `data/02_preprocessed/images/`；标注 → `data/03_labeled/`
+- **本人**：提供校正脚本；公开数据集 → 训练天气分类模型；标注数据集 → 训练分割模型；推理 → 输出至 `outputs/`（含实际面积）
 - 数模组：读取 `outputs/quantifications/` 进行预测建模
 
 #### 五、最终交付物
-1. 天气分类模型权重（`models/weather_classifier/model.pth`）及训练推理代码。
-2. 三个 DeepLabV3+ 分割模型权重（`models/deeplabv3plus/{weather}/best_model.pth`）及训练脚本。
-3. 总推理脚本 `models/predict_pipeline.py`。
-4. 实测分割掩码图（`outputs/masks/`）与量化数据（`outputs/quantifications/`）。
-5. 数模组对接接口文档。
-6. 模型评估报告。
+1. 正射校正脚本（`utils/preprocess/`）及使用文档。
+2. 天气分类模型权重（`models/weather_classifier/best_weather_model.pth`）及训练推理代码。
+3. 三个 DeepLabV3+ 分割模型权重（`models/deeplabv3plus/{weather}/best_model.pth`）及训练脚本。
+4. 总推理脚本 `models/predict_pipeline.py`。
+5. 实测分割掩码图（`outputs/masks/`）与量化数据（`outputs/quantifications/`，含实际面积）。
+6. 数模组对接接口文档。
+7. 模型评估报告。

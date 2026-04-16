@@ -1,12 +1,13 @@
 ### 无人机浮游植物识别项目 - 数据链路（贺一冉）专属 README
+
 #### 一、核心定位
 作为项目全链路数据负责人，全权把控数据从原始采集到标准化标注的全流程，输出唯一、高质量的浮游植物数据集，为AI视觉模块（Tianyu+刘俊辉）提供可直接用于 DeepLabV3+ 分割模型训练/推理的标准化数据输入。**天气分类模型的训练数据由公开数据集提供，本模块不负责准备。**
 
 #### 二、绝对清晰的工作边界
 ✅ 核心负责（数据端全流程）
-1. 配合航拍组完成多天气条件下无人机图像采集，严格把控拍摄规范与原始数据归档，确保文件命名符合 `YYYYMMDD_天气_序号.RAW` 格式。
-2. 对原始图像做全流程预处理，输出干净PNG图像至 `data/02_preprocessed/images/`，文件名保持不变（扩展名改为.png）。
-3. 使用LabelMe完成像素级精准标注，JSON标注存入 `data/03_labeled/labels_json/`，掩码图存入 `data/03_labeled/masks/`。
+1. 配合航拍组完成多天气条件下无人机图像及配套参数的采集，严格把控拍摄规范与原始数据归档。
+2. 运行AI模块提供的正射校正脚本，输出几何校正后的标准PNG图像。
+3. 使用LabelMe完成像素级精准标注，输出JSON标注与掩码图。
 4. 归档全量数据，交付至AI视觉模块并配合完成数据核验。
 
 ❌ 绝不涉及
@@ -16,29 +17,32 @@
 
 #### 三、分步执行任务（含路径约定）
 
-1. **原始数据采集与归档**
-   - 接收航拍组交付的RAW图像，按 `YYYYMMDD_天气_序号.RAW` 命名后存入 `data/01_raw/`。
-   - 建立采集台账，记录每张图像的拍摄日期、天气、区域。
+**1. 原始数据采集与归档**
+- 接收航拍组交付的 RAW 图像及配套无人机参数文件（需包含高度、姿态角、相机内参）。
+- 按 `YYYYMMDD_天气_序号.RAW` / `YYYYMMDD_天气_序号.json` 命名，分别存入 `data/01_raw/images/` 和 `data/01_raw/drone_json/`。
+- 建立采集台账，记录每张图像的拍摄日期、天气、区域。
 
-2. **图像预处理**
-   - 读取 `data/01_raw/` 中RAW图像，执行去反光、去雾、色彩校正、尺寸统一（1024×1024）。
-   - 输出PNG图像至 `data/02_preprocessed/images/`，文件名与原始图一致（仅扩展名变化）。
+**2. 几何校正执行（正射校正）**
+- 使用 AI 模块提供的脚本 `utils/preprocess/orthorectify.py`。
+- 批量读取 `data/01_raw/images/` 中的 RAW 图像及 `data/01_raw/drone_json/` 中的同名参数文件。
+- 执行正射校正，输出垂直视角的 PNG 图像至 `data/02_preprocessed/images/`，文件名与原始图一致（仅扩展名变化）。
+- **注意：色彩校正、去雾等操作由天气自适应分割模型隐式处理，此处不进行。**
 
-3. **LabelMe像素级标注**
-   - 使用LabelMe打开 `data/02_preprocessed/images/` 中的图像，按约定类别标注。
-   - JSON标注文件保存至 `data/03_labeled/labels_json/`，生成对应掩码图存入 `data/03_labeled/masks/`。
+**3. LabelMe像素级标注**
+- 使用 LabelMe 打开 `data/02_preprocessed/images/` 中的校正图像，按约定类别标注。
+- JSON 标注文件保存至 `data/03_labeled/labels_json/`，生成对应掩码图存入 `data/03_labeled/masks/`。
 
-4. **数据交付与核验**
-   - 交付对象：AI视觉模块（吴天宇、刘俊辉）
-   - 交付内容：
-     - `data/02_preprocessed/images/`（干净图像）
-     - `data/03_labeled/labels_json/`（标注JSON）
-     - `data/03_labeled/masks/`（掩码图）
-   - 配合核验，修正异常。
+**4. 数据交付与核验**
+- 交付对象：AI视觉模块（吴天宇、刘俊辉）
+- 交付内容：
+  - `data/02_preprocessed/images/`（校正后的干净图像）
+  - `data/03_labeled/labels_json/`（标注JSON）
+  - `data/03_labeled/masks/`（掩码图）
+- 配合核验，修正异常。
 
 #### 四、最终交付物
-1. 原始航拍图像集（`data/01_raw/`，含采集台账）。
-2. 预处理干净图像集（`data/02_preprocessed/images/`）。
+1. 原始航拍图像集（`data/01_raw/images/`，含采集台账及配套无人机参数文件 `data/01_raw/drone_json/`）。
+2. 正射校正后的干净图像集（`data/02_preprocessed/images/`）。
 3. 标注完成的全量数据集（`data/03_labeled/`）。
-4. 数据链路全流程文档（含命名规范、预处理参数、标注规则）。
+4. 数据链路全流程文档（含命名规范、校正参数、标注规则）。
 5. 数据交付核验单。
