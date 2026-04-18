@@ -195,7 +195,7 @@ Phytoplankton_UAV_Project/
 │ │ │ └── best_model.pth
 │ │ └── foggy/
 │ │ ├── train.py
-│ │ └── best_model.pth
+│ │ └── best_weather_model.pth
 │ │
 │ └── predict_pipeline.py # 总推理入口：输入图像+参数 → 天气分类 → 分割 → 量化（含实际面积）
 │
